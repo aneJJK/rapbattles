@@ -1,0 +1,9 @@
+body { font-family: sans-serif; background: #121212; color: #fff; text-align: center; }
+.container { max-width: 500px; margin: 50px auto; padding: 20px; }
+.card { background: #1e1e1e; padding: 20px; border-radius: 12px; }
+.hidden { display: none !important; }
+.btn { padding: 12px 24px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; margin: 10px; }
+.primary { background: #ff4757; color: white; }
+.secondary { background: #2ed573; color: white; }
+.fighters { display: flex; justify-content: space-between; font-size: 24px; margin: 20px 0; }
+.timer { font-size: 36px; font-weight: bold; color: #ffa500; }

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rap Battle MVP</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+    .hidden { display: none !important; }
+    
+    /* Top Bar */
+    .top-bar { width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; }
+    .profile-info { display: flex; gap: 10px; align-items: center; }
+    
+    /* Card Container */
+    .card { background: #1e293b; width: 100%; max-width: 600px; padding: 24px; border-radius: 16px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    
+    /* Buttons & Inputs */
+    button { background: #3b82f6; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; margin: 5px; }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #64748b; cursor: not-allowed; }
+    .btn-secondary { background: #475569; }
+    .btn-secondary:hover { background: #334155; }
+    .btn-danger { background: #ef4444; }
+    .btn-danger:hover { background: #dc2626; }
+    
+    input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; }
+    
+    /* Modals */
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; }
+    .modal-content { background: #1e293b; padding: 24px; border-radius: 12px; width: 320px; text-align: center; }
+    
+    /* Battle Screens */
+    .timer { font-size: 3rem; font-weight: bold; color: #f59e0b; margin: 15px 0; }
+    .speakers { display: flex; justify-content: space-between; margin: 20px 0; font-size: 1.2rem; }
+    .winner-box { padding: 20px; border-radius: 12px; margin-top: 15px; }
+    .winner-box.win { background: #065f46; color: #a7f3d0; }
+    .winner-box.lose { background: #991b1b; color: #fecaca; }
+    .winner-box.draw { background: #334155; color: #cbd5e1; }
+    
+    .error-text { color: #f87171; font-size: 0.85rem; margin-top: 5px; }
+    .badge { background: #334155; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Шапка -->
+  <div class="top-bar">
+    <div class="profile-info">
+      <span id="bar-username">Гость</span>
+      <span id="bar-status" class="badge">Авторизуйтесь</span>
+      <span id="admin-online" class="badge hidden" style="background:#8b5cf6;">🟢 В сети: <span id="online-count">0</span></span>
+    </div>
+    <button id="logout-btn" class="btn-danger hidden">Выйти</button>
+  </div>
+
+  <!-- Главное меню -->
+  <div id="main-card" class="card">
+    <h2>🏆 RAP BATTLE MVP</h2>
+    <p style="margin: 15px 0; color: #94a3b8;">Готов доказать свой фристайл или засудить оппонентов?</p>
+    <div style="margin-top: 20px;">
+      <button id="prep-mic-btn" style="font-size: 1.1rem; padding: 15px 30px;">🎤 ГОТОВ К МИКРОФОНУ</button>
+      <button id="be-judge-btn" class="btn-secondary" style="font-size: 1.1rem; padding: 15px 30px;">⚖️ СТАТЬ СУДЬЕЙ</button>
+    </div>
+  </div>
+
+  <!-- Экран поиска -->
+  <div id="searching" class="card hidden">
+    <h2>ПОИСК МАТЧА</h2>
+    <p id="search-status" style="margin: 20px 0;">⏳ Ищем соперника и судей...</p>
+    <button id="cancel-search-btn" class="btn-danger">Отменить поиск</button>
+  </div>
+
+  <!-- Экран батла -->
+  <div id="battle" class="card hidden">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="role-badge" class="badge">🎤 ВЫ — РЭПЕР</span>
+      <span id="judges-counter" class="badge">👨‍⚖️ Судей в батле: 0</span>
+    </div>
+    <h2 id="round-title" style="margin-top: 15px;">ROUND 1</h2>
+    <div class="timer" id="timer">30</div>
+    <p id="turn-status" style="font-size: 1.2rem; color: #38bdf8;">Читает: ...</p>
+    
+    <div class="speakers">
+      <div id="p1-name" style="font-weight: bold;">Рэпер 1</div>
+      <div>VS</div>
+      <div id="p2-name" style="font-weight: bold;">Рэпер 2</div>
+    </div>
+    <audio id="remote-audio" autoplay></audio>
+  </div>
+
+  <!-- Экран голосования и итогов -->
+  <div id="voting" class="card hidden">
+    <h2>ГОЛОСОВАНИЕ СУДЕЙ</h2>
+    <p id="wrapper-msg" style="margin: 15px 0; color: #fbbf24;">Выберите победителя раунда</p>
+
+    <div id="judge-controls" style="margin: 20px 0;">
+      <button id="vote-p1">🎤 Рэпер 1</button>
+      <button id="vote-p2">🎤 Рэпер 2</button>
+    </div>
+
+    <div id="winner-container" class="hidden">
+      <div id="winner-box" class="winner-box">
+        <h3 id="winner-text">🏆 ПОБЕДИТЕЛЬ: ...</h3>
+        <p id="rpr-details" style="margin-top: 10px;"></p>
+      </div>
+      <button id="back-to-menu-btn" style="margin-top: 20px;">Вернуться в меню</button>
+    </div>
+  </div>
+
+  <!-- Модальное окно входа -->
+  <div id="login-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Вход в аккаунт</h3>
+      <input type="text" id="login-username" placeholder="Логин">
+      <input type="password" id="login-password" placeholder="Пароль">
+      <button id="logout-btn" class="btn-danger hidden">Выйти</button>
+      <div id="login-error" class="error-text hidden"></div>
+      <button id="login-btn" style="width: 100%; margin-top: 10px;">Войти</button>
+      <p style="margin-top: 15px; font-size: 0.85rem;">Нет аккаунта? <a href="#" id="go-to-reg-btn" style="color: #38bdf8;">Зарегистрироваться</a></p>
+    </div>
+  </div>
+
+  <!-- Модальное окно регистрации -->
+  <div id="register-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Регистрация</h3>
+      <input type="text" id="reg-username" placeholder="Логин">
+      <input type="password" id="reg-password" placeholder="Пароль">
+      <input type="password" id="reg-password-confirm" placeholder="Повторите пароль">
+      <div id="reg-error" class="error-text hidden"></div>
+      <button id="register-btn" style="width: 100%; margin-top: 10px;">Создать аккаунт</button>
+      <p style="margin-top: 15px; font-size: 0.85rem;">Уже есть аккаунт? <a href="#" id="go-to-login-btn" style="color: #38bdf8;">Войти</a></p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
